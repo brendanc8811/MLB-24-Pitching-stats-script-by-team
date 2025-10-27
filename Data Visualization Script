@@ -1,0 +1,247 @@
+library(readr)
+library(dplyr)
+library(tidyr)
+library(plotly)
+
+# Load data
+pitching <- read_csv("Pitching_2024_with_Advanced_Stats.csv")
+
+# Team logos
+team_logos <- list(
+  ARI = "https://a.espncdn.com/i/teamlogos/mlb/500/ari.png",
+  ATL = "https://a.espncdn.com/i/teamlogos/mlb/500/atl.png",
+  BAL = "https://a.espncdn.com/i/teamlogos/mlb/500/bal.png",
+  BOS = "https://a.espncdn.com/i/teamlogos/mlb/500/bos.png",
+  CHN = "https://a.espncdn.com/i/teamlogos/mlb/500/chc.png",
+  CHA = "https://a.espncdn.com/i/teamlogos/mlb/500/chw.png",
+  CIN = "https://a.espncdn.com/i/teamlogos/mlb/500/cin.png",
+  CLE = "https://a.espncdn.com/i/teamlogos/mlb/500/cle.png",
+  COL = "https://a.espncdn.com/i/teamlogos/mlb/500/col.png",
+  DET = "https://a.espncdn.com/i/teamlogos/mlb/500/det.png",
+  HOU = "https://a.espncdn.com/i/teamlogos/mlb/500/hou.png",
+  KCA  = "https://a.espncdn.com/i/teamlogos/mlb/500/kc.png",
+  LAA = "https://a.espncdn.com/i/teamlogos/mlb/500/laa.png",
+  LAN = "https://a.espncdn.com/i/teamlogos/mlb/500/lad.png",
+  MIA = "https://a.espncdn.com/i/teamlogos/mlb/500/mia.png",
+  MIL = "https://a.espncdn.com/i/teamlogos/mlb/500/mil.png",
+  MIN = "https://a.espncdn.com/i/teamlogos/mlb/500/min.png",
+  NYN = "https://a.espncdn.com/i/teamlogos/mlb/500/nym.png",
+  NYA = "https://a.espncdn.com/i/teamlogos/mlb/500/nyy.png",
+  OAK = "https://a.espncdn.com/i/teamlogos/mlb/500/oak.png",
+  PHI = "https://a.espncdn.com/i/teamlogos/mlb/500/phi.png",
+  PIT = "https://a.espncdn.com/i/teamlogos/mlb/500/pit.png",
+  SDN  = "https://a.espncdn.com/i/teamlogos/mlb/500/sd.png",
+  SEA = "https://a.espncdn.com/i/teamlogos/mlb/500/sea.png",
+  SFN  = "https://a.espncdn.com/i/teamlogos/mlb/500/sf.png",
+  SLNL = "https://a.espncdn.com/i/teamlogos/mlb/500/stl.png",
+  TBA  = "https://a.espncdn.com/i/teamlogos/mlb/500/tb.png",
+  TEX = "https://a.espncdn.com/i/teamlogos/mlb/500/tex.png",
+  TOR = "https://a.espncdn.com/i/teamlogos/mlb/500/tor.png",
+  WSH = "https://a.espncdn.com/i/teamlogos/mlb/500/wsh.png"
+)
+
+# Metrics
+metrics <- c("WHIP", "ERA", "FIP", "K_per_9", "BB_per_9", "K_BB_ratio",
+             "H_per_9", "HR_per_9", "SO_per_BB", "ERA_minus", "FIP_minus", "K_pct")
+lower_better <- c("WHIP", "ERA", "FIP", "BB_per_9", "H_per_9", "HR_per_9", "ERA_minus", "FIP_minus")
+teams <- sort(unique(pitching$teamID))
+
+# Prepare data
+long_data <- pitching %>%
+  select(playerID, teamID, IP, G, all_of(metrics)) %>%
+  pivot_longer(cols = all_of(metrics), names_to = "Metric", values_to = "Value") %>%
+  filter(!is.na(Value))
+
+avg_lines <- long_data %>%
+  group_by(Metric) %>%
+  summarise(League_Avg = mean(Value, na.rm = TRUE), .groups = "drop")
+
+long_data <- long_data %>%
+  left_join(avg_lines, by = "Metric") %>%
+  mutate(
+    Deviation = (Value - League_Avg) / League_Avg,
+    Color = case_when(
+      Metric %in% lower_better & Deviation <= -0.05 ~ "green",
+      Metric %in% lower_better & abs(Deviation) <= 0.05 ~ "yellow",
+      Metric %in% lower_better & Deviation > 0.05 ~ "red",
+      !(Metric %in% lower_better) & Deviation >= 0.05 ~ "green",
+      !(Metric %in% lower_better) & abs(Deviation) <= 0.05 ~ "yellow",
+      !(Metric %in% lower_better) & Deviation < -0.05 ~ "red",
+      TRUE ~ "gray"
+    ),
+    Player = paste0(
+      "Player: ", playerID,
+      "<br>", Metric, ": ", round(Value, 3),
+      "<br>IP: ", round(IP, 1),
+      "<br>G: ", G
+    )
+  ) %>%
+  group_by(teamID, Metric) %>%
+  arrange(Value) %>%
+  mutate(x_pos = row_number()) %>%
+  ungroup()
+
+color_map <- c("green" = "forestgreen", "yellow" = "gold", "red" = "firebrick")
+
+# Frames and dropdown
+all_frames <- list()
+dropdown_options <- list()
+
+for (team in teams) {
+  for (metric in metrics) {
+    df <- long_data %>% filter(teamID == team, Metric == metric)
+    avg_val <- avg_lines %>% filter(Metric == metric) %>% pull(League_Avg)
+    frame_id <- paste0(team, "_", metric)
+    label <- paste0(team, " - ", metric)
+
+    all_frames[[length(all_frames) + 1]] <- list(
+      name = frame_id,
+      data = list(
+        list(
+          type = "scatter",
+          mode = "markers",
+          x = df$x_pos,
+          y = df$Value,
+          text = df$Player,
+          hoverinfo = "text",
+          marker = list(
+            size = 6,
+            color = color_map[df$Color],
+            line = list(color = "black", width = 0.3)
+          ),
+          showlegend = FALSE
+        ),
+        list(
+          type = "scatter",
+          mode = "lines",
+          x = c(0, max(df$x_pos) + 2),
+          y = c(avg_val, avg_val),
+          text = paste0("League Avg (", metric, "): ", round(avg_val, 3)),
+          hoverinfo = "text",
+          line = list(dash = "dot", width = 2, color = "red"),
+          showlegend = FALSE
+        )
+      ),
+      layout = list(
+        images = list(list(
+          source = team_logos[[team]],
+          xref = "paper", yref = "paper",
+          x = 1.05, y = 1.05,
+          sizex = 0.2, sizey = 0.2,
+          xanchor = "left", yanchor = "top",
+          layer = "above"
+        ))
+      )
+    )
+
+    dropdown_options[[length(dropdown_options) + 1]] <- list(
+      label = label,
+      method = "animate",
+      args = list(
+        list(frame_id),
+        list(mode = "immediate", frame = list(duration = 0), transition = list(duration = 0))
+      )
+    )
+  }
+}
+
+# Initial view
+initial_team <- teams[1]
+initial_metric <- metrics[1]
+init_df <- long_data %>% filter(teamID == initial_team, Metric == initial_metric)
+init_avg <- avg_lines %>% filter(Metric == initial_metric) %>% pull(League_Avg)
+
+fig <- plot_ly() %>%
+  add_trace(
+    x = init_df$x_pos,
+    y = init_df$Value,
+    type = "scatter",
+    mode = "markers",
+    text = init_df$Player,
+    hoverinfo = "text",
+    marker = list(
+      size = 6,
+      color = color_map[init_df$Color],
+      line = list(color = "black", width = 0.3)
+    ),
+    showlegend = FALSE
+  ) %>%
+  add_trace(
+    x = c(0, max(init_df$x_pos) + 2),
+    y = c(init_avg, init_avg),
+    type = "scatter",
+    mode = "lines",
+    line = list(dash = "dot", width = 2, color = "red"),
+    text = paste0("League Avg (", initial_metric, "): ", round(init_avg, 3)),
+    hoverinfo = "text",
+    showlegend = FALSE
+  ) %>%
+  # Dummy legend entries
+  add_trace(
+    x = c(-999), y = c(-999),
+    type = "scatter", mode = "markers",
+    marker = list(color = "forestgreen", size = 8),
+    name = "Above Avg (Good)",
+    legendgroup = "legend",
+    showlegend = TRUE
+  ) %>%
+  add_trace(
+    x = c(-999), y = c(-999),
+    type = "scatter", mode = "markers",
+    marker = list(color = "gold", size = 8),
+    name = "Near Avg",
+    legendgroup = "legend",
+    showlegend = TRUE
+  ) %>%
+  add_trace(
+    x = c(-999), y = c(-999),
+    type = "scatter", mode = "markers",
+    marker = list(color = "firebrick", size = 8),
+    name = "Below Avg (Poor)",
+    legendgroup = "legend",
+    showlegend = TRUE
+  ) %>%
+  layout(
+    title = " Teams Advanced Metrics vs League Average",
+    xaxis = list(title = "", showticklabels = FALSE, range = c(0, max(init_df$x_pos) + 2)),
+    yaxis = list(title = "Metric Value"),
+    updatemenus = list(
+      list(
+        type = "dropdown",
+        direction = "down",
+        x = 0.01,
+        y = 1.15,
+        active = 0,
+        showactive = TRUE,
+        buttons = dropdown_options
+      )
+    ),
+    images = list(list(
+      source = team_logos[[initial_team]],
+      xref = "paper", yref = "paper",
+      x = 1.05, y = 1.05,
+      sizex = 0.2, sizey = 0.2,
+      xanchor = "left", yanchor = "top",
+      layer = "above"
+    )),
+    legend = list(
+      x = 1.05,
+      y = 0.15,  # ⬅️ moved legend down
+      bgcolor = "white",
+      bordercolor = "black",
+      borderwidth = 0.5
+    )
+  ) %>%
+  animation_opts(frame = 0, transition = 0, redraw = TRUE)
+
+fig$x$frames <- all_frames
+fig
+
+# Save to Desktop(Optional)
+desktop_path <- if (.Platform$OS.type == "windows") {
+  file.path(Sys.getenv("USERPROFILE"), "Desktop", "pitching_metrics_dashboard.html")
+} else {
+  file.path("~", "Desktop", "pitching_metrics_dashboard.html")
+}
+
+htmlwidgets::saveWidget(fig, desktop_path, selfcontained = TRUE)
