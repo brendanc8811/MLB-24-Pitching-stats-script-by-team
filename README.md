@@ -3,7 +3,7 @@ A script that visualizes data to compare MLB level pitchers from every team to t
 
 INCLUDED BELOW:
 
-Packages to install in your R-Project,
+Packages to install in your R-Project,(Just press download)
 Data set to use (2024 season only, you can use your own if you wish),
 Vsiualization script (plug into R), 
 
