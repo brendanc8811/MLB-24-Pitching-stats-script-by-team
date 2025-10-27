@@ -1,5 +1,6 @@
 # MLB-24-Pitching-Visualzation-Script-for-R
 A script that visualizes data to compare MLB level pitchers from every team to the league average depending on stat
+If you do not want to run the script on your own you I have attached the final resoults
 
 INCLUDED BELOW:
 
