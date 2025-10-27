@@ -9,4 +9,8 @@ Vsiualization script (plug into R),
 
 NOTICE:
 
-If you decide to use your own stats file you will need to edit the # Load data 
+If you decide to use your own stats file you will need to edit the # Load data (line 7) so that it matches your csv file.
+If using your own csv make sure the stats in the script match the stats in the file.
+
+**I DO NOT RECOMMEND USING YOUR OWN CSV, THIS SCRIPT WAS MADE SPECIFICALLY FOR THE FILE ATTATCHED**
+
