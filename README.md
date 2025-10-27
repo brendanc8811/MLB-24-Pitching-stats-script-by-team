@@ -6,6 +6,7 @@ INCLUDED BELOW:
 Packages to install in your R-Project,(Just press download)
 Data set to use (2024 season only, you can use your own if you wish),
 Vsiualization script (plug into R), 
+When the chart comes up you might have to auto scale and then zoom in as it will look like the stats are all on the average line(when you hover over them they will show you the true stat...working on fix for this.
 
 NOTICE:
 
